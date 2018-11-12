@@ -19,6 +19,7 @@ def lambda_handler(event, context):
     # Conserva ultima n AMIs. AMI_RESTRAIN_DAYS se obtiene de variable de entorno runtime y/o
     # SO -e.g. bash$ export AMI_RESTRAIN_DAYS=10
     AMI_RESTRAIN_DAYS = os.getenv("AMI_RESTRAIN_DAYS", 2)
+    instance_ids = event.get("InstanceIds", [])  # Lista de instancias EC2
 
     """Calcula un valor clave para cada elemento.
     
@@ -57,10 +58,10 @@ def lambda_handler(event, context):
             "Name": "is-public",
             "Values": ["false"]
         },
-        # AMIs posee llave 'InstanceID'
+        # AMIs relacionados a instancia EC2
         {
-            "Name": "tag-key",
-            "Values": ["InstanceID"]
+            "Name": "tag:InstanceID",
+            "Values": instance_ids
         }
     ]
     ec2 = boto3.resource("ec2")
