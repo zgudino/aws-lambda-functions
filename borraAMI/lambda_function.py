@@ -16,9 +16,9 @@ Returns:
 
 
 def lambda_handler(event, context):
-    # Conserva ultima n AMIs. AMI_RESTRAIN_DAYS se obtiene de variable de entorno runtime y/o
-    # SO -e.g. bash$ export AMI_RESTRAIN_DAYS=10
-    AMI_RESTRAIN_DAYS = os.getenv("AMI_RESTRAIN_DAYS", 2)
+    # Conserva ultima n AMIs. RESTRAIN_DAYS se obtiene de variable de entorno runtime y/o SO
+    RESTRAIN_DAYS = os.getenv("RESTRAIN_DAYS", 2)
+    restrain_days = int(RESTRAIN_DAYS)
     instance_ids = event.get("InstanceIds", [])  # Lista de instancias EC2
 
     """Calcula un valor clave para cada elemento.
@@ -77,7 +77,7 @@ def lambda_handler(event, context):
 
     for k, g in grouped_amis:
         amis_ordered_by_creation_date = sorted(list(g), key=lambda e: e['creation_date'])
-        unwanted_amis = amis_ordered_by_creation_date[:(-1 * AMI_RESTRAIN_DAYS)]  # AMIs para eliminar
+        unwanted_amis = amis_ordered_by_creation_date[:(-1 * restrain_days)]  # AMIs para eliminar
 
         if len(unwanted_amis) < 1:
             continue
