@@ -8,7 +8,7 @@ def lambda_handler(event, source):
     ec2 = boto3.resource("ec2")
 
     for ec2 in ec2.instances.filter(InstanceIds=instance_ids):
-        if not ec2.id and not ec2.state.code == RUNNING:
+        if not ec2.id or not ec2.state["Code"] == RUNNING:
             continue
 
         ec2.stop()
