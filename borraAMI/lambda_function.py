@@ -4,6 +4,15 @@ import logging
 import json
 from itertools import groupby
 
+logger = logging.getLogger(__name__)
+logger_handler = logging.StreamHandler()
+logger_formatter = logging.Formatter("%(levelname)s::%(asctime)s %(message)s")
+
+logger_handler.setFormatter(logger_formatter)
+
+logger.addHandler(logger_handler)
+logger.setLevel(logging.INFO)
+
 """Elimina EC2 AMIs recursivamente cuya antiguedad excede umbral deseado.
 
 Parameters:
@@ -46,11 +55,6 @@ def lambda_handler(event, context):
             # `values` es convertido a `dict` devolviendo valor de 'InstanceID'
             return dict([values]).get('InstanceID')
 
-    # Configuracion basica de sistema logging
-    logging.basicConfig(level=logging.INFO,
-                        format="[%(levelname)s] %(asctime)s :: %(message)s",
-                        datefmt="%Y-%m-%d %H:%M:%S")
-
     # Aplica filtros contra coleccion de AMIs
     filters = [
         # AMIs privadas
@@ -66,6 +70,13 @@ def lambda_handler(event, context):
     ]
     ec2 = boto3.resource("ec2")
 
+    try:
+        if len(instance_ids) < 1:
+            raise RuntimeError("InstanceIds está vacío o no definido.")
+    except RuntimeError as e:
+        logger.error(e, exc_info=True)
+        return
+
     # Resultado es una `list` de `dict` con atributos `image_id`, `creation_date` y `tags` del recurso EC2 Image
     amis = [{"image_id": image.image_id, "creation_date": image.creation_date, "tags": image.tags} for image in
             ec2.images.filter(Filters=filters)]
@@ -76,19 +87,19 @@ def lambda_handler(event, context):
     grouped_amis = groupby(ordered_amis, key=image_instance_id)
 
     for k, g in grouped_amis:
-        amis_ordered_by_creation_date = sorted(list(g), key=lambda e: e['creation_date'])
+        amis_ordered_by_creation_date = sorted(list(g), key=lambda i: i['creation_date'])
         unwanted_amis = amis_ordered_by_creation_date[:(-1 * restrain_days)]  # AMIs para eliminar
 
         if len(unwanted_amis) < 1:
             continue
 
-        logging.info("--------------------AMIs-----------------------")
-        logging.info("\n%s" % json.dumps(unwanted_amis, indent=2))
+        logger.info("--------------------AMIs-----------------------")
+        logger.info("\n%s" % json.dumps(unwanted_amis, indent=2))
 
         for ami in ec2.images.filter(ImageIds=[ami.get("image_id") for ami in unwanted_amis]):
             blocks = ami.block_device_mappings
 
-            logging.info(f"Desregistrar AMI {ami.image_id} (Listo)")
+            logger.info(f"Desregistrando AMI {ami.image_id}. Listo!")
 
             ami.deregister()
 
@@ -96,10 +107,10 @@ def lambda_handler(event, context):
                 snapshot_id = block.get("Ebs", {}).get("SnapshotId")
                 snapshot = ec2.Snapshot(snapshot_id)
 
-                logging.info(f"Eliminar Snapshot {snapshot_id} (Listo)")
+                logger.info(f"Eliminando Snapshot {snapshot_id}. Listo!")
 
                 snapshot.delete()
 
-        logging.info("-----------------------------------------------")
+        logger.info("-----------------------------------------------")
 
     return {"message": "Ok"}
